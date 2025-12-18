@@ -1,0 +1,35 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\deadlineservice\\module.deadlineservice.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\5.6_test\\deadline_test_build\\intermediate\\build\\win64\\x64\\deadline_test_buildeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\deadlineservice\\definitions.deadlineservice.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\assetdefinition_deadlinejobpreset.gen.cpp",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\assetdefinition_deadlinejobpreset.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlinejobpreset.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlinejobpreset.generated.h",
+            "c:\\program files\\epic games\\ue_5.6\\engine\\source\\editor\\unrealed\\public\\assetdefinitiondefault.h",
+            "c:\\program files\\epic games\\ue_5.6\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\unrealed\\uht\\assetdefinitiondefault.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\assetdefinition_deadlinejobpreset.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlinejobpresetfactory.gen.cpp",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlinejobpresetfactory.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlinejobpresetfactory.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineservice.init.gen.cpp",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineserviceeditorhelpers.gen.cpp",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlineserviceeditorhelpers.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlineserviceeditorsettings.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineserviceeditorsettings.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineserviceeditorhelpers.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineserviceeditorsettings.gen.cpp",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineservicetimermanager.gen.cpp",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlineservicetimermanager.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlineservicetimermanager.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\deadlineservice\\permoduleinline.gen.cpp",
+            "c:\\program files\\epic games\\ue_5.6\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

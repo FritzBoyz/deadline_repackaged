@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\private\\deadlineservicemodule.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\5.6_test\\deadline_test_build\\intermediate\\build\\win64\\x64\\deadline_test_buildeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\deadlineservice\\definitions.deadlineservice.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlineservicemodule.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

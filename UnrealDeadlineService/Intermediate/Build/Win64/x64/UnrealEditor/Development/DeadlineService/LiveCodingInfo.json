@@ -1,0 +1,18 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.DeadlineService.cpp.obj": [
+			"AssetDefinition_DeadlineJobPreset.gen.cpp.obj",
+			"DeadlineJobPresetFactory.gen.cpp.obj",
+			"DeadlineService.init.gen.cpp.obj",
+			"DeadlineServiceEditorHelpers.gen.cpp.obj",
+			"DeadlineServiceEditorSettings.gen.cpp.obj",
+			"DeadlineServiceTimerManager.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"DeadlineJobPreset.cpp.obj",
+			"DeadlineJobPresetFactory.cpp.obj",
+			"DeadlineServiceEditorSettings.cpp.obj",
+			"DeadlineServiceModule.cpp.obj"
+		]
+	}
+}

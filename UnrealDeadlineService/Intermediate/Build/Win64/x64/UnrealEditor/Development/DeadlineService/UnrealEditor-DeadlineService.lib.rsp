@@ -1,0 +1,16 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-DeadlineService.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"D:/5.6_TEST/deadline_test_build/Intermediate/Build/Win64/x64/deadline_test_buildEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/Module.DeadlineService.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/DeadlineJobPreset.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/DeadlineJobPresetFactory.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/DeadlineServiceEditorSettings.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/DeadlineServiceModule.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/Default.rc2.res"
+/OUT:"D:/5.6_TEST/deadline_test_build/Plugins/UnrealDeadlineService/Intermediate/Build/Win64/x64/UnrealEditor/Development/DeadlineService/UnrealEditor-DeadlineService.lib"
