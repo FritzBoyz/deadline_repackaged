@@ -1,0 +1,17 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\5.6_test\\deadline_test_build\\plugins\\moviepipelinedeadline\\source\\moviepipelinedeadline\\private\\moviepipelinedeadlinesettings.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\5.6_test\\deadline_test_build\\intermediate\\build\\win64\\x64\\deadline_test_buildeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "d:\\5.6_test\\deadline_test_build\\plugins\\moviepipelinedeadline\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\dmp\\definitions.dmp.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\moviepipelinedeadline\\source\\moviepipelinedeadline\\public\\moviepipelinedeadlinesettings.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\source\\deadlineservice\\public\\deadlinejobpreset.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\unrealdeadlineservice\\intermediate\\build\\win64\\unrealeditor\\inc\\deadlineservice\\uht\\deadlinejobpreset.generated.h",
+            "d:\\5.6_test\\deadline_test_build\\plugins\\moviepipelinedeadline\\intermediate\\build\\win64\\unrealeditor\\inc\\dmp\\uht\\moviepipelinedeadlinesettings.generated.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

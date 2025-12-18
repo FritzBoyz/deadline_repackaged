@@ -1,0 +1,17 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-MoviePipelineDeadline.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"D:/5.6_TEST/deadline_test_build/Intermediate/Build/Win64/x64/deadline_test_buildEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/Module.DMP.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/DeadlineJobPresetCustomization.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/MoviePipelineDeadlineExecutorJob.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/MoviePipelineDeadlineExecutorJobCustomization.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/MoviePipelineDeadlineModule.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/MoviePipelineDeadlineSettings.cpp.obj"
+"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/Default.rc2.res"
+/OUT:"D:/5.6_TEST/deadline_test_build/Plugins/MoviePipelineDeadline/Intermediate/Build/Win64/x64/UnrealEditor/Development/DMP/UnrealEditor-MoviePipelineDeadline.lib"
