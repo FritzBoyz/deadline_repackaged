@@ -1,0 +1,16 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.DMP.cpp.obj": [
+			"MoviePipelineDeadline.init.gen.cpp.obj",
+			"MoviePipelineDeadlineExecutorJob.gen.cpp.obj",
+			"MoviePipelineDeadlineSettings.gen.cpp.obj",
+			"PerModuleInline.gen.cpp.obj",
+			"DeadlineJobPresetCustomization.cpp.obj",
+			"MoviePipelineDeadlineExecutorJob.cpp.obj",
+			"MoviePipelineDeadlineExecutorJobCustomization.cpp.obj",
+			"MoviePipelineDeadlineModule.cpp.obj",
+			"MoviePipelineDeadlineSettings.cpp.obj"
+		]
+	}
+}
