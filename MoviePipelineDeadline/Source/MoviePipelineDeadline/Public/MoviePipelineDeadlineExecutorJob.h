@@ -44,6 +44,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, config, Category = "Deadline")
 	FString BatchName;
 
+	/** `Deadline Job Name` explicit name for the job in Deadline. If empty, a default name will be generated. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, config, Category = "Deadline")
+	FString DeadlineJobName;
+
 	/* Deadline Job Preset. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Deadline")
 	TObjectPtr<UDeadlineJobPreset> JobPreset;

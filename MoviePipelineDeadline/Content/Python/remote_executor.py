@@ -309,7 +309,12 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
 
         # check for required fields in pluginInfo
         if not plugin_info.get("Executable"):
-            plugin_info["Executable"] = "C:/Program Files/Epic Games/UE_5.6/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+            # Try to resolve dynamically
+            engine_bin = unreal.Paths.convert_relative_path_to_full(unreal.Paths.engine_dir())
+            exe_path = os.path.join(engine_bin, "Binaries", "Win64", "UnrealEditor-Cmd.exe")
+            exe_path = exe_path.replace("\\", "/") 
+            plugin_info["Executable"] = exe_path
+            unreal.log_warning(f"Executable not in preset, inferred: {exe_path}")
             
         if not plugin_info.get("ProjectFile"):
             if unreal.Paths.is_project_file_path_set():
@@ -349,6 +354,92 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
             raise RuntimeError(
                 "Failed to get a project name. Please set a project!"
             )
+
+        # ----------------------------------------------------------------------
+        # CUSTOM: Sync Job Name from Preset -> MRQ Job
+        # ----------------------------------------------------------------------
+        preset_job_name = job_info.get("Name", "")
+        if preset_job_name and preset_job_name not in ["Untitled", "Untitled_Job"]:
+             # If the user explicitly set a name in the Job Description, update the MRQ job name
+             job.job_name = preset_job_name
+             unreal.log(f"Syncing MRQ Job Name to Preset Name: {preset_job_name}")
+
+        # ----------------------------------------------------------------------
+        # CUSTOM: Inject Unreal Context into Deadline Job Info
+        # ----------------------------------------------------------------------
+        
+        # 1. Get Context Strings
+        project_name = "UnknownProject"
+        if unreal.Paths.is_project_file_path_set():
+            project_name = unreal.Paths.get_base_filename(unreal.Paths.get_project_file_path())
+
+        def _safe_asset_name(soft_obj):
+            try:
+                if soft_obj is None:
+                    return "Unknown"
+                if hasattr(soft_obj, "asset_path_name"):
+                    apn = soft_obj.asset_path_name
+                    if hasattr(apn, "asset_name"):
+                        return str(apn.asset_name)
+                s = str(soft_obj)
+                if "." in s:
+                    return s.rsplit(".", 1)[-1]
+                if "/" in s:
+                    return s.split("/")[-1]
+                return s or "Unknown"
+            except Exception:
+                return "Unknown"
+
+        map_name = _safe_asset_name(getattr(job, "map", None)) or "UnknownMap"
+        seq_name = _safe_asset_name(getattr(job, "sequence", None)) or "UnknownSequence"
+
+        # 2. Update Job Name
+        #    Priority:
+        #    a) Manual Override (from UI DeadlineJobName field if available)
+        #    b) Preset Name (already in job_info)
+        #    c) MRQ Job Name (from the UI list)
+        #    d) Auto-generated Format: [Project] SequenceName - MapName
+        
+        deadline_job_name_override = getattr(job, "deadline_job_name", "").strip()
+        
+        if deadline_job_name_override:
+             job_info["Name"] = deadline_job_name_override
+        else:
+             # Fallback logic
+             current_job_name = job_info.get("Name", "")
+             mrq_job_name = getattr(job, "job_name", "").strip()
+
+             # Check if the current job name (from Preset) is generic
+             is_preset_generic = not current_job_name or current_job_name in ["Untitled", "Untitled_Job"]
+             
+             if is_preset_generic:
+                 # If Preset is generic, try to use the MRQ Job Name
+                 if mrq_job_name and mrq_job_name not in ["Untitled", "Untitled_Job"]:
+                     job_info["Name"] = mrq_job_name
+                 else:
+                     # If both are generic, auto-generate
+                     job_info["Name"] = f"[{project_name}] {seq_name} - {map_name}"
+
+        # 3. Set Department
+        if not job_info.get("Department"):
+            job_info["Department"] = "Unreal Engine"
+
+        # 4. Set Batch Name (Group by Project)
+        if not job_info.get("BatchName"):
+            job_info["BatchName"] = project_name
+
+        # 5. Add Extra Info (Columns in Deadline Monitor)
+        #    We append to ExtraInfoKeyValue# 
+        def _add_deadline_kv(info_dict, prefix, key, value):
+            idx = 0
+            while f"{prefix}{idx}" in info_dict:
+                idx += 1
+            info_dict[f"{prefix}{idx}"] = f"{key}={value}"
+
+        _add_deadline_kv(job_info, "ExtraInfoKeyValue", "Project", project_name)
+        _add_deadline_kv(job_info, "ExtraInfoKeyValue", "Map", map_name)
+        _add_deadline_kv(job_info, "ExtraInfoKeyValue", "Sequence", seq_name)
+        _add_deadline_kv(job_info, "ExtraInfoKeyValue", "EngineVersion", unreal.SystemLibrary.get_engine_version())
 
         # Create a new queue with only this job in it and save it to disk,
         # then load it, so we can send it with the REST API
