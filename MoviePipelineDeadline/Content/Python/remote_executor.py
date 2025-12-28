@@ -38,14 +38,129 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
         """
         
         unreal.log(f"Asked to execute Queue: {pipeline_queue}")
-        unreal.log(f"Queue has {len(pipeline_queue.get_jobs())} jobs")
-
-        # Don't try to process empty/null Queues, no need to send them to
-        # Deadline.
+        
+        # Don't try to process empty/null Queues
         if not pipeline_queue or (not pipeline_queue.get_jobs()):
             self.on_executor_finished_impl()
             return
 
+        # ----------------------------------------------------------------------
+        # 1. Early Filter: Identify Enabled Jobs
+        # ----------------------------------------------------------------------
+        all_jobs = pipeline_queue.get_jobs()
+        enabled_jobs = []
+        disabled_count = 0
+        
+        for i, job in enumerate(all_jobs):
+            job_name = getattr(job, "job_name", "Unknown")
+            unreal.log(f"[Deadline] Inspecting Job {i}: {job_name} (Type: {type(job)})")
+
+            # 1. Check Job Enabled Status
+            is_enabled = False
+            
+            # Special Handling for MoviePipelineDeadlineExecutorJob
+            # This specific class (used by the Deadline plugin itself) seems to NOT have the 'enabled' property exposed to Python.
+            if "MoviePipelineDeadlineExecutorJob" in str(type(job)):
+                # 1. Try C++ Helper (IsJobEnabled) - Added in recent source patch
+                # Note: BlueprintCallable functions usually exposed as snake_case in Python
+                if hasattr(job, "is_job_enabled"):
+                    try:
+                        is_enabled = job.is_job_enabled()
+                        unreal.log(f"[Deadline] Used C++ helper 'is_job_enabled' for '{job_name}': {is_enabled}")
+                    except Exception as e:
+                         unreal.log_warning(f"[Deadline] Failed calling 'is_job_enabled': {e}")
+                         is_enabled = True # Fallback
+                
+                # 2. Fallback: Check if ANY shots are enabled
+                else:
+                    unreal.log_warning(f"[Deadline] 'MoviePipelineDeadlineExecutorJob' detected but 'is_job_enabled' helper missing. Please recompile plugin. Defaulting '{job_name}' to ENABLED.")
+                    is_enabled = True
+            else:
+                try:
+                    # Try getting the property via the editor library first (most reliable for UI state)
+                    try:
+                        is_enabled = job.get_editor_property("enabled")
+                        unreal.log(f"[Deadline]   - get_editor_property('enabled'): {is_enabled}")
+                    except Exception as e_prop:
+                        unreal.log(f"[Deadline]   - get_editor_property failed: {e_prop}")
+                        
+                        # Fallback to direct attribute access
+                        if hasattr(job, "enabled"):
+                            is_enabled = job.enabled
+                            unreal.log(f"[Deadline]   - job.enabled: {is_enabled}")
+                        else:
+                            unreal.log_warning(f"[Deadline] Job '{job_name}' has no 'enabled' property. Defaulting to FALSE (Safety).")
+                            is_enabled = False
+                except Exception as e:
+                    unreal.log_warning(f"[Deadline] Error reading enabled state for '{job_name}': {e}")
+                    is_enabled = False # Safety fallback
+            
+            unreal.log(f"[Deadline] Debug - Job: {job_name}, Enabled: {is_enabled}")
+
+
+            # 2. Check Shot Enabled Status
+            # If there are shots, at least one must be enabled.
+            # If there are NO shots (e.g. single sequence), we assume the job is valid.
+            has_enabled_shot = True
+            try:
+                shots = getattr(job, "shot_info", [])
+                if shots:
+                    has_enabled_shot = False
+                    for s in shots:
+                        if getattr(s, "enabled", True):
+                            has_enabled_shot = True
+                            break
+            except Exception as e:
+                unreal.log_warning(f"[Deadline] Error reading shot info for '{job_name}': {e}")
+                has_enabled_shot = True  # Be permissive
+            
+            # Log the decision for debugging
+            # unreal.log(f"[Deadline] Job '{job_name}': Enabled={is_enabled}, HasEnabledShot={has_enabled_shot}")
+
+            if is_enabled and has_enabled_shot:
+                enabled_jobs.append(job)
+            else:
+                disabled_count += 1
+
+        unreal.log(f"[Deadline] Found {len(all_jobs)} total jobs. Enabled: {len(enabled_jobs)}. Disabled: {disabled_count}.")
+
+        if not enabled_jobs:
+            unreal.EditorDialog.show_message(
+                "No Enabled Jobs",
+                "No jobs are enabled (checked) in the queue.\n\n"
+                "Please check the box next to the job(s) you want to render.\n"
+                "(Highlighting/Selecting a row is not enough!)",
+                unreal.AppMsgType.OK
+            )
+            self.on_executor_finished_impl()
+            return
+
+        # If multiple jobs are enabled, we will process them all.
+        # Previously there was a check here to limit to 1 job, but that prevents batch submissions.
+
+        # ----------------------------------------------------------------------
+        # 2. User Confirmation (Explicit Check)
+        # ----------------------------------------------------------------------
+        job_names = [getattr(j, "job_name", "Unknown") for j in enabled_jobs]
+        job_list_str = "\n".join(f"- {name}" for name in job_names[:10])
+        if len(job_names) > 10:
+            job_list_str += "\n... and more"
+
+        confirm_msg = (
+            f"Ready to submit {len(enabled_jobs)} job(s) to Deadline:\n\n"
+            f"{job_list_str}\n\n"
+            "Is this correct?"
+        )
+        
+        # Uncomment this block if you want to force a confirmation dialog every time
+        # if unreal.EditorDialog.show_message("Confirm Submission", confirm_msg, unreal.AppMsgType.YES_NO) != unreal.AppMsgType.YES:
+        #     unreal.log("[Deadline] User cancelled submission.")
+        #     self.on_executor_finished_impl()
+        #     return
+
+        # ----------------------------------------------------------------------
+        # 3. Save Dirty Packages
+        # ----------------------------------------------------------------------
         # The user must save their work and check it in so that Deadline
         # can sync it.
         dirty_packages = []
@@ -67,7 +182,7 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
                     "One or more jobs in the queue have an unsaved map/content. "
                     "{packages} "
                     "Please save and check-in all work before submission.".format(
-                        packages="\n".join(dirty_packages)
+                        packages="\n".join([p.get_name() for p in dirty_packages])
                     )
                 )
 
@@ -78,17 +193,20 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
                 self.on_executor_finished_impl()
                 return
 
+        # ----------------------------------------------------------------------
+        # 4. Validate Maps (Only for Enabled Jobs)
+        # ----------------------------------------------------------------------
         # Make sure all the maps in the queue exist on disk somewhere,
         # unsaved maps can't be loaded on the remote machine, and it's common
         # to have the wrong map name if you submit without loading the map.
         has_valid_map = (
             unreal.MoviePipelineEditorLibrary.is_map_valid_for_remote_render(
-                pipeline_queue.get_jobs()
+                enabled_jobs
             )
         )
         if not has_valid_map:
             message = (
-                "One or more jobs in the queue have an unsaved map as "
+                "One or more ENABLED jobs in the queue have an unsaved map as "
                 "their target map. "
                 "These unsaved maps cannot be loaded by an external process, "
                 "and the render has been aborted."
@@ -117,14 +235,9 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
             unreal.MoviePipelineInProcessExecutorSettings
         )
         inherited_cmds = in_process_executor_settings.inherited_command_line_arguments
-
+        
         # Sanitize the commandline by removing any execcmds that may
         # have passed through the commandline.
-        # We remove the execcmds because, in some cases, users may execute a
-        # script that is local to their editor build for some automated
-        # workflow but this is not ideal on the farm. We will expect all
-        # custom startup commands for rendering to go through the `Start
-        # Command` in the MRQ settings.
         inherited_cmds = re.sub(
             ".*(?P<cmds>-execcmds=[\s\S]+[\'\"])",
             "",
@@ -161,23 +274,9 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
 
         deadline_service = get_global_deadline_service_instance()
 
-        # Get all jobs from the queue
-        all_jobs = self.pipeline_queue.get_jobs()
-
-        # 🔹 Filter out disabled jobs (default to enabled=True if missing)
-        enabled_jobs = [job for job in all_jobs if getattr(job, "enabled", True)]
-
-        if not enabled_jobs:
-            unreal.log_warning("No enabled jobs found in queue. Nothing will be submitted.")
-            unreal.EditorDialog.show_message(
-                "Submission Result",
-                "No enabled jobs found in the queue.\nPlease enable at least one job to submit.",
-                unreal.AppMsgType.OK,
-            )
-            self.on_executor_finished_impl()
-            return
-
-
+        # NOTE: We already filtered enabled_jobs at the start of the function.
+        # We will use that list now.
+        
         # Log info
         unreal.log(f"Filtered {len(all_jobs) - len(enabled_jobs)} disabled jobs from the queue.")
         unreal.log(f"Submitting {len(enabled_jobs)} enabled jobs to Deadline...")
@@ -296,9 +395,17 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
         # Get the Job Info and plugin Info
         # If we have a preset set on the job, get the deadline submission details
         try:
-            if hasattr(job, 'get_deadline_job_preset_struct'):job_info, plugin_info = get_deadline_info_from_preset(job_preset_struct=job.get_deadline_job_preset_struct())
-            else:job_info = project_job_info.copy() if 'project_job_info' in locals() else {} 
-            plugin_info = project_plugin_info.copy() if 'project_plugin_info' in locals() else {}
+            preset_struct = None
+            if hasattr(job, 'get_deadline_job_preset_struct_with_overrides'):
+                preset_struct = job.get_deadline_job_preset_struct_with_overrides()
+            elif hasattr(job, 'get_deadline_job_preset_struct'):
+                preset_struct = job.get_deadline_job_preset_struct()
+
+            if preset_struct:
+                job_info, plugin_info = get_deadline_info_from_preset(job_preset_struct=preset_struct)
+            else:
+                job_info = project_job_info.copy() if 'project_job_info' in locals() else {}
+                plugin_info = project_plugin_info.copy() if 'project_plugin_info' in locals() else {}
 
         # Fail the submission if any errors occur
         except Exception as err:
@@ -539,32 +646,158 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
             unreal.log_warning("No shots enabled in shot mask, not submitting.")
             return
 
-        # --- FRAME RANGE HANDLING (From MRG Variables) ---
-        start_frame, end_frame = 0, 0  # Default fallback
+        # --- FRAME RANGE HANDLING ---
+        # Priority:
+        # 1) Use Frames from Job Description (UI) if provided
+        # 2) Fallback to MRG variables (best-effort)
+        # 3) Leave as unset (Deadline will handle defaults)
+        start_frame, end_frame = None, None
+        ui_frames = str(job_info.get("Frames", "")).strip()
+        if ui_frames:
+            try:
+                parts = [p.strip() for p in ui_frames.split("-")]
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    start_frame, end_frame = int(parts[0]), int(parts[1])
+                    unreal.log(f"[Deadline] Using Frames from UI: {start_frame}-{end_frame}")
+                else:
+                    unreal.log_warning(f"[Deadline] Invalid Frames format in UI: '{ui_frames}'")
+            except Exception as e:
+                unreal.log_warning(f"[Deadline] Failed to parse UI Frames '{ui_frames}': {e}")
 
-        try:
-            # Each MRQ Job (new_job) is generated from a Movie Graph
-            config = new_job.get_configuration()
-            graph_vars = config.get_all_settings()  # Includes all nodes & variables
+        if start_frame is None or end_frame is None:
+            # Try to read from Movie Graph variables if present
+            try:
+                config = new_job.get_configuration()
+                graph_vars = config.get_all_settings()
+                for var in graph_vars:
+                    var_name = var.get_name()
+                    if "MovieGraphVariable_10" in var_name:
+                        start_frame = int(var.get_value())
+                    elif "MovieGraphVariable_11" in var_name:
+                        end_frame = int(var.get_value())
+                if start_frame is not None and end_frame is not None:
+                    unreal.log(f"[Deadline] Frame range (from MRG vars): {start_frame}–{end_frame}")
+            except Exception as e:
+                unreal.log_warning(f"[Deadline] Could not read MovieGraphVariables: {e}")
 
-            # Iterate through graph settings to locate your variables
-            for var in graph_vars:
-                var_name = var.get_name()
-                if "MovieGraphVariable_10" in var_name:
-                    start_frame = int(var.get_value())
-                elif "MovieGraphVariable_11" in var_name:
-                    end_frame = int(var.get_value())
+        if start_frame is None or end_frame is None:
+            # Fallback: Read playback range directly from Level Sequence
+            try:
+                seq_soft = getattr(job, "sequence", None)
+                seq_asset = None
+                if seq_soft:
+                    path = None
+                    try:
+                        if isinstance(seq_soft, unreal.SoftObjectPath):
+                            path = seq_soft.get_asset_path_string()
+                        elif hasattr(seq_soft, "get_asset_path_string"):
+                            path = seq_soft.get_asset_path_string()
+                        elif hasattr(seq_soft, "to_string"):
+                            path = seq_soft.to_string()
+                        else:
+                            s = str(seq_soft).strip()
+                            path = s if s and not s.startswith("<") else None
+                    except Exception:
+                        path = None
+                    if path:
+                        seq_asset = unreal.EditorAssetLibrary.load_asset(path)
+                if seq_asset:
+                    # Try multiple API shapes to be resilient across UE versions
+                    movie_scene = None
+                    if hasattr(seq_asset, "get_movie_scene"):
+                        movie_scene = seq_asset.get_movie_scene()
+                    # Extract start/end frames
+                    s_val = e_val = None
+                    if movie_scene:
+                        # Path A: explicit start/end getters
+                        if hasattr(movie_scene, "get_playback_start") and hasattr(movie_scene, "get_playback_end"):
+                            s = movie_scene.get_playback_start()
+                            e = movie_scene.get_playback_end()
+                            s_val = getattr(s, "value", s)
+                            e_val = getattr(e, "value", e)
+                        # Path B: range object
+                        elif hasattr(movie_scene, "get_playback_range"):
+                            rng = movie_scene.get_playback_range()
+                            # Try common accessors
+                            a = getattr(rng, "get_start_frame", None)
+                            b = getattr(rng, "get_end_frame", None)
+                            if callable(a) and callable(b):
+                                s = a()
+                                e = b()
+                                s_val = getattr(s, "value", s)
+                                e_val = getattr(e, "value", e)
+                            else:
+                                # Fall back to tuple-like or attributes
+                                a = getattr(rng, "start", None) or getattr(rng, "lower_bound", None)
+                                b = getattr(rng, "end", None) or getattr(rng, "upper_bound", None)
+                                s_val = getattr(a, "value", a)
+                                e_val = getattr(b, "value", b)
+                    # Assign if valid
+                    if isinstance(s_val, int) and isinstance(e_val, int):
+                        start_frame, end_frame = s_val, e_val
+                        unreal.log(f"[Deadline] Frame range (from LevelSequence): {start_frame}-{end_frame}")
+            except Exception as e:
+                unreal.log_warning(f"[Deadline] Could not derive frames from LevelSequence: {e}")
 
-            unreal.log(f"[Deadline] Frame range (from MRG vars): {start_frame}–{end_frame}")
+        # Fallback: Calculate from Shot Info if available
+        if start_frame is None or end_frame is None:
+            try:
+                unreal.log("[Deadline] Attempting to derive frame range from Shot Info...")
+                min_frame = float("inf")
+                max_frame = float("-inf")
+                has_valid_shots = False
+                
+                # Check the shots in the job
+                for shot in new_job.shot_info:
+                    if not shot.enabled:
+                        continue
+                        
+                    # We can try to get the playback range from the shot's inner sequence if loaded,
+                    # or rely on the cached start/end times if exposed. 
+                    # Note: shot_info usually contains simple structs.
+                    # We might need to load the asset if we want precise bounds, 
+                    # but let's check if the shot object has useful metadata.
+                    
+                    # Since we are in the executor, we can try to inspect the queue or the job's context.
+                    # However, simpler is to check if we can get the sequence from the shot path
+                    shot_path = shot.inner_name
+                    if shot_path:
+                        shot_asset = unreal.EditorAssetLibrary.load_asset(str(shot_path))
+                        if shot_asset and hasattr(shot_asset, "get_movie_scene"):
+                            ms = shot_asset.get_movie_scene()
+                            if ms and hasattr(ms, "get_playback_range"):
+                                rng = ms.get_playback_range()
+                                # Extract start/end
+                                s = getattr(rng, "get_start_frame", lambda: getattr(rng, "start", None))
+                                e = getattr(rng, "get_end_frame", lambda: getattr(rng, "end", None))
+                                s_val = s() if callable(s) else s
+                                e_val = e() if callable(e) else e
+                                s_val = getattr(s_val, "value", s_val)
+                                e_val = getattr(e_val, "value", e_val)
+                                
+                                if isinstance(s_val, int) and isinstance(e_val, int):
+                                    if s_val < min_frame: min_frame = s_val
+                                    if e_val > max_frame: max_frame = e_val
+                                    has_valid_shots = True
 
-        except Exception as e:
-            unreal.log_warning(f"[Deadline] Could not read MovieGraphVariables: {e}")
+                if has_valid_shots and min_frame != float("inf"):
+                    start_frame, end_frame = int(min_frame), int(max_frame)
+                    unreal.log(f"[Deadline] Frame range (from Shot Info): {start_frame}-{end_frame}")
+
+            except Exception as e:
+                 unreal.log_warning(f"[Deadline] Could not derive frames from Shot Info: {e}")
 
 
-        # --- DEADLINE FRAME INFO ---
-        job_info["Frames"] = f"{start_frame}-{end_frame}"
-        job_info["ChunkSize"] = str(1)  # ensure string type
-        unreal.log(f"[Deadline] Submitting frame range: {job_info['Frames']} (chunk size {job_info['ChunkSize']})")
+        if start_frame is not None and end_frame is not None:
+            job_info["Frames"] = f"{start_frame}-{end_frame}"
+            job_info["ChunkSize"] = "1"
+            unreal.log(f"[Deadline] Submitting frame range: {job_info['Frames']} (chunk size {job_info['ChunkSize']})")
+        else:
+             # Fallback to single frame task if range cannot be determined
+             job_info["Frames"] = "0"
+             job_info["ChunkSize"] = "1"
+             unreal.log_error("[Deadline] Failed to determine frame range! Submitting as single task (Frame 0).")
+
 
 
         # Optional manual override for resumable renders
@@ -576,9 +809,10 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
             end_frame = resume_to if resume_to is not None else end_frame
             unreal.log(f"[Deadline] Overriding frame range: {start_frame}-{end_frame}")
 
-        # Assign to Deadline
-        job_info["Frames"] = f"{start_frame}-{end_frame}"
-        unreal.log(f"[Deadline] Using frame range {start_frame}-{end_frame} for job {new_job.job_name}")
+        # Assign to Deadline only if valid
+        if start_frame is not None and end_frame is not None:
+            job_info["Frames"] = f"{start_frame}-{end_frame}"
+            unreal.log(f"[Deadline] Using frame range {start_frame}-{end_frame} for job {new_job.job_name}")
 
         # Get the current index of the ExtraInfoKeyValue pair, we will
         # increment the index, so we do not stomp other settings
@@ -615,6 +849,15 @@ class MoviePipelineDeadlineRemoteExecutor(unreal.MoviePipelineExecutorBase):
             if new_job.filename_format_override:
                 job_info[f"ExtraInfoKeyValue{current_index}"] = f"filename_format_override={new_job.filename_format_override}"
                 current_index += 1
+
+        frames_val = job_info.get("Frames", "")
+        if frames_val:
+            job_info[f"ExtraInfoKeyValue{current_index}"] = f"frames={frames_val}"
+            current_index += 1
+        chunk_val = job_info.get("ChunkSize", "")
+        if chunk_val:
+            job_info[f"ExtraInfoKeyValue{current_index}"] = f"chunk_size={chunk_val}"
+            current_index += 1
 
         # Build the command line arguments the remote machine will use.
         # The Deadline plugin will provide the executable since it is local to

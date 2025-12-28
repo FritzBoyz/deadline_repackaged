@@ -47,7 +47,9 @@ def render_queue_manifest(
     remote_job_preset=None,
     executor_instance=None,
     output_dir_override=None,
-    output_filename_override=None
+    output_filename_override=None,
+    custom_start_frame=None,
+    custom_end_frame=None
 ):
     """
     Function to execute a render using a manifest file
@@ -106,6 +108,90 @@ def render_queue_manifest(
 
     # Set the author on the job
     render_job.author = user or getuser()
+
+    if (custom_start_frame is not None) and (custom_end_frame is not None):
+        # Clamp Level Sequence playback range for manifest job
+        try:
+            seq_soft = getattr(render_job, "sequence", None)
+            seq_asset = None
+            if seq_soft:
+                path = None
+                try:
+                    if isinstance(seq_soft, unreal.SoftObjectPath):
+                        path = seq_soft.get_asset_path_string()
+                    elif hasattr(seq_soft, "get_asset_path_string"):
+                        path = seq_soft.get_asset_path_string()
+                    elif hasattr(seq_soft, "to_string"):
+                        path = seq_soft.to_string()
+                    else:
+                        s = str(seq_soft).strip()
+                        path = s if s and not s.startswith("<") else None
+                except Exception:
+                    path = None
+                if path:
+                    seq_asset = unreal.EditorAssetLibrary.load_asset(path)
+            if seq_asset and hasattr(seq_asset, "get_movie_scene"):
+                movie_scene = seq_asset.get_movie_scene()
+                start_val = int(custom_start_frame)
+                end_val = int(custom_end_frame)
+                if end_val <= start_val:
+                    end_val = start_val + 1
+                start_fn = unreal.FrameNumber(start_val)
+                end_fn = unreal.FrameNumber(end_val)
+                if hasattr(movie_scene, "set_playback_start") and hasattr(movie_scene, "set_playback_end"):
+                    movie_scene.set_playback_start(start_fn)
+                    movie_scene.set_playback_end(end_fn)
+                    unreal.log(f"Clamped Level Sequence playback to {start_val}-{end_val} for manifest job `{render_job.job_name}`")
+                elif hasattr(movie_scene, "set_playback_range"):
+                    try:
+                        movie_scene.set_playback_range(start_fn, end_fn)
+                        unreal.log(f"Clamped Level Sequence playback via set_playback_range to {start_val}-{end_val} for manifest job `{render_job.job_name}`")
+                    except Exception:
+                        movie_scene.set_editor_property("playback_start", start_fn)
+                        movie_scene.set_editor_property("playback_end", end_fn)
+                        unreal.log(f"Clamped Level Sequence playback via editor properties to {start_val}-{end_val} for manifest job `{render_job.job_name}`")
+                else:
+                    try:
+                        movie_scene.set_editor_property("playback_start", start_fn)
+                        movie_scene.set_editor_property("playback_end", end_fn)
+                        unreal.log(f"Clamped Level Sequence playback via editor properties to {start_val}-{end_val} for manifest job `{render_job.job_name}`")
+                    except Exception as e:
+                        unreal.log_warning(f"Failed to clamp Level Sequence playback for manifest job `{render_job.job_name}`: {e}")
+            else:
+                unreal.log_warning(f"No Level Sequence found on manifest job `{render_job.job_name}`; skipping playback clamp")
+        except Exception as e:
+            unreal.log_warning(f"Error while clamping Level Sequence playback for manifest job `{render_job.job_name}`: {e}")
+
+            output_setting = render_job.get_configuration().find_setting_by_class(
+                unreal.MoviePipelineOutputSetting
+            )
+            if output_setting:
+                output_setting.flush_disk_writes_per_shot = True
+                output_setting.use_custom_playback_range = True
+                start_fn = unreal.FrameNumber(int(custom_start_frame))
+                end_fn = unreal.FrameNumber(int(custom_end_frame))
+                output_setting.set_editor_property("custom_start_frame", start_fn)
+                output_setting.set_editor_property("custom_end_frame", end_fn)
+                unreal.log(
+                    f"Applying custom playback range: {int(custom_start_frame)}-{int(custom_end_frame)}"
+                )
+            else:
+                unreal.log_warning("MoviePipelineOutputSetting not found; cannot apply custom playback range.")
+            try:
+                config = render_job.get_configuration()
+                for var in config.get_all_settings():
+                    name = var.get_name()
+                    if "MovieGraphVariable_10" in name:
+                        var.set_value(int(custom_start_frame))
+                    elif "MovieGraphVariable_11" in name:
+                        var.set_value(int(custom_end_frame))
+                unreal.log(
+                    f"Applying MovieGraph frame variables: start={int(custom_start_frame)} end={int(custom_end_frame)}"
+                )
+            except Exception as e:
+                unreal.log_warning(f"Failed to apply MovieGraph frame variables: {e}")
+        except Exception:
+            pass
 
     # If we have a shot list, iterate over the shots in the sequence
     # and disable anything that's not in the shot list. If no shot list is

@@ -62,6 +62,16 @@ void UMoviePipelineDeadlineExecutorJob::PostEditChangeProperty(FPropertyChangedE
 	}
 }
 
+bool UMoviePipelineDeadlineExecutorJob::IsJobEnabled() const
+{
+	return IsEnabled();
+}
+
+void UMoviePipelineDeadlineExecutorJob::SetJobEnabled(bool bInEnabled)
+{
+	SetIsEnabled(bInEnabled);
+}
+
 FDeadlineJobPresetStruct UMoviePipelineDeadlineExecutorJob::GetDeadlineJobPresetStructWithOverrides() const
 {
 	// Start with preset properties

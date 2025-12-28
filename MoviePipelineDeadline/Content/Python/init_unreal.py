@@ -7,11 +7,16 @@ from pathlib import Path
 # Third-party
 import unreal
 
-import remote_executor
-import mrq_cli
-
 plugin_name = "MoviePipelineDeadline"
 
+try:
+    import remote_executor
+    import mrq_cli
+except ImportError as e:
+    unreal.log_error(f"Failed to import required modules in {plugin_name}: {e}")
+    # We don't raise here to allow the engine to continue, but the plugin won't work fully.
+except Exception as e:
+    unreal.log_error(f"Unexpected error importing modules in {plugin_name}: {e}")
 
 # Add the actions path to sys path
 actions_path = Path(__file__).parent.joinpath("pipeline_actions").as_posix().lower()

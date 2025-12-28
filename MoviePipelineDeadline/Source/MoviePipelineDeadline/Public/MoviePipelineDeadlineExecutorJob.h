@@ -23,6 +23,14 @@ class MOVIEPIPELINEDEADLINE_API UMoviePipelineDeadlineExecutorJob : public UMovi
 public:
 	UMoviePipelineDeadlineExecutorJob();
 
+	/** Helper to get Enabled state from Python if direct property access fails */
+	UFUNCTION(BlueprintCallable, Category = "Deadline")
+	bool IsJobEnabled() const;
+
+	/** Helper to set Enabled state from Python if direct property access fails */
+	UFUNCTION(BlueprintCallable, Category = "Deadline")
+	void SetJobEnabled(bool bInEnabled);
+
 	bool IsPropertyRowEnabledInMovieRenderJob(const FName& InPropertyPath) const;
 
 	void SetPropertyRowEnabledInMovieRenderJob(const FName& InPropertyPath, bool bInEnabled);

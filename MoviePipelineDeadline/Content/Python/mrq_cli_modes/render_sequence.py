@@ -110,6 +110,15 @@ def render_current_sequence(
         f"Setting the movie pipeline preset to `{mrq_preset_data_asset.asset_name}`"
     )
     render_job.set_configuration(mrq_preset_data_asset.get_asset())
+    try:
+        cfg = render_job.get_configuration()
+        unreal.log(f"Sequence job configuration class: {cfg.__class__.__name__}")
+        try:
+            unreal.log(f"Sequence job configuration path: {cfg.get_path_name()}")
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     # MRQ added the ability to enable and disable jobs. Check to see is a job
     # is disabled and enable it. The assumption is we want to render this

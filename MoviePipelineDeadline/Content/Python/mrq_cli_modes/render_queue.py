@@ -61,7 +61,9 @@ def render_queue_asset(
     remote_job_preset=None,
     executor_instance=None,
     output_dir_override=None,
-    output_filename_override=None
+    output_filename_override=None,
+    custom_start_frame=None,
+    custom_end_frame=None
 ):
     """
     Render using a Movie Render Queue asset
@@ -113,6 +115,120 @@ def render_queue_asset(
             all_shots=all_shots,
             user=user
         )
+
+    try:
+        for job in movie_pipeline_queue.get_jobs():
+            cfg = job.get_configuration()
+            unreal.log(f"Job `{job.job_name}` configuration class: {cfg.__class__.__name__}")
+            try:
+                unreal.log(f"Job `{job.job_name}` configuration path: {cfg.get_path_name()}")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    if (custom_start_frame is not None) and (custom_end_frame is not None):
+        try:
+            for job in movie_pipeline_queue.get_jobs():
+                # Clamp Level Sequence playback range for MovieGraph/Sequence pipelines
+                try:
+                    seq_soft = getattr(job, "sequence", None)
+                    if not seq_soft:
+                         seq_soft = getattr(job, "level_sequence", None)
+
+                    seq_asset = None
+                    if seq_soft:
+                        path = None
+                        try:
+                            if isinstance(seq_soft, unreal.SoftObjectPath):
+                                path = seq_soft.get_asset_path_string()
+                            elif hasattr(seq_soft, "get_asset_path_string"):
+                                path = seq_soft.get_asset_path_string()
+                            elif hasattr(seq_soft, "to_string"):
+                                path = seq_soft.to_string()
+                            else:
+                                s = str(seq_soft).strip()
+                                path = s if s and not s.startswith("<") else None
+                            
+                            unreal.log(f"Job `{job.job_name}` sequence soft path resolved to: {path}")
+                        except Exception as e:
+                            unreal.log_warning(f"Failed to resolve sequence path for job `{job.job_name}`: {e}")
+                            path = None
+                        
+                        if path:
+                            try:
+                                seq_asset = unreal.EditorAssetLibrary.load_asset(path)
+                                if not seq_asset:
+                                     unreal.log_warning(f"EditorAssetLibrary.load_asset returned None for path: {path}")
+                            except Exception as e:
+                                unreal.log_warning(f"Failed to load asset at {path}: {e}")
+                    else:
+                        unreal.log_warning(f"Job `{job.job_name}` has no 'sequence' attribute or it is None.")
+                    if seq_asset and hasattr(seq_asset, "get_movie_scene"):
+                        movie_scene = seq_asset.get_movie_scene()
+                        # Engine expects end to be exclusive; clamp to single chunk range
+                        start_val = int(custom_start_frame)
+                        end_val = int(custom_end_frame)
+                        # Ensure at least one frame; if equal, make end exclusive
+                        if end_val <= start_val:
+                            end_val = start_val + 1
+                        start_fn = unreal.FrameNumber(start_val)
+                        end_fn = unreal.FrameNumber(end_val)
+                        if hasattr(movie_scene, "set_playback_start") and hasattr(movie_scene, "set_playback_end"):
+                            movie_scene.set_playback_start(start_fn)
+                            movie_scene.set_playback_end(end_fn)
+                            unreal.log(f"Clamped Level Sequence playback to {start_val}-{end_val} for job `{job.job_name}`")
+                        elif hasattr(movie_scene, "set_playback_range"):
+                            try:
+                                movie_scene.set_playback_range(start_fn, end_fn)
+                                unreal.log(f"Clamped Level Sequence playback via set_playback_range to {start_val}-{end_val} for job `{job.job_name}`")
+                            except Exception:
+                                # Fallback to editor properties if range setter signature differs
+                                movie_scene.set_editor_property("playback_start", start_fn)
+                                movie_scene.set_editor_property("playback_end", end_fn)
+                                unreal.log(f"Clamped Level Sequence playback via editor properties to {start_val}-{end_val} for job `{job.job_name}`")
+                        else:
+                            # Final fallback using editor properties if available
+                            try:
+                                movie_scene.set_editor_property("playback_start", start_fn)
+                                movie_scene.set_editor_property("playback_end", end_fn)
+                                unreal.log(f"Clamped Level Sequence playback via editor properties to {start_val}-{end_val} for job `{job.job_name}`")
+                            except Exception as e:
+                                unreal.log_warning(f"Failed to clamp Level Sequence playback for job `{job.job_name}`: {e}")
+                    else:
+                        unreal.log_warning(f"No Level Sequence found on job `{job.job_name}`; skipping playback clamp")
+                except Exception as e:
+                    unreal.log_warning(f"Error while clamping Level Sequence playback for job `{job.job_name}`: {e}")
+                output_setting = job.get_configuration().find_setting_by_class(
+                    unreal.MoviePipelineOutputSetting
+                )
+                if output_setting:
+                    output_setting.flush_disk_writes_per_shot = True
+                    output_setting.use_custom_playback_range = True
+                    start_fn = unreal.FrameNumber(int(custom_start_frame))
+                    end_fn = unreal.FrameNumber(int(custom_end_frame))
+                    output_setting.set_editor_property("custom_start_frame", start_fn)
+                    output_setting.set_editor_property("custom_end_frame", end_fn)
+                    unreal.log(
+                        f"Applying custom playback range: {int(custom_start_frame)}-{int(custom_end_frame)}"
+                    )
+                else:
+                    unreal.log_warning("MoviePipelineOutputSetting not found; cannot apply custom playback range.")
+                try:
+                    config = job.get_configuration()
+                    for var in config.get_all_settings():
+                        name = var.get_name()
+                        if "MovieGraphVariable_10" in name:
+                            var.set_value(int(custom_start_frame))
+                        elif "MovieGraphVariable_11" in name:
+                            var.set_value(int(custom_end_frame))
+                    unreal.log(
+                        f"Applying MovieGraph frame variables: start={int(custom_start_frame)} end={int(custom_end_frame)}"
+                    )
+                except Exception as e:
+                    unreal.log_warning(f"Failed to apply MovieGraph frame variables: {e}")
+        except Exception:
+            pass
 
     try:
         # Execute the render. This will execute the render based on whether

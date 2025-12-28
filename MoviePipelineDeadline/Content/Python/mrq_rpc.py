@@ -149,6 +149,12 @@ class MRQRender(BaseRPC):
 
         current_task_data = shot_data.get(str(self.current_task_id))
 
+        # Fallback: If we can't find the task ID in the shot data,
+        # AND we only have one shot defined, assume we are rendering that shot
+        # (Distributed Frame Rendering context)
+        if not current_task_data and len(shot_data) == 1:
+             current_task_data = list(shot_data.values())[0]
+
 
         if not current_task_data:
             self.proxy.fail_render("There are no task data to execute!")
@@ -220,6 +226,31 @@ class MRQRender(BaseRPC):
         )
         executor.on_executor_errored_delegate.add_callable(self._on_job_failed)
 
+        frames_str = self.proxy.get_job_extra_info_key_value("frames")
+        chunk_str = self.proxy.get_job_extra_info_key_value("chunk_size")
+        start_frame = None
+        end_frame = None
+        if frames_str:
+            try:
+                parts = [p.strip() for p in str(frames_str).split("-")]
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    start_frame = int(parts[0])
+                    end_frame = int(parts[1])
+            except Exception:
+                pass
+        chunk_size = 1
+        try:
+            if chunk_str:
+                chunk_size = int(chunk_str)
+        except Exception:
+            chunk_size = 1
+        if start_frame is not None and end_frame is not None:
+            frame_start = start_frame + (int(self.current_task_id) * chunk_size)
+            frame_end = min(frame_start + chunk_size - 1, end_frame)
+            unreal.log(
+                f"Task {self.current_task_id} custom frame range: {frame_start}-{frame_end} (chunk {chunk_size})"
+            )
+
         # Render queue with executor
         render_queue_asset(
             queue_path,
@@ -227,7 +258,9 @@ class MRQRender(BaseRPC):
             user=self.proxy.get_job_user(),
             executor_instance=executor,
             output_dir_override=output_dir_override,
-            output_filename_override=filename_format_override
+            output_filename_override=filename_format_override,
+            custom_start_frame=frame_start if (start_frame is not None and end_frame is not None) else None,
+            custom_end_frame=frame_end if (start_frame is not None and end_frame is not None) else None
         )
 
     def render_serialized_pipeline(
@@ -263,13 +296,40 @@ class MRQRender(BaseRPC):
         )
         executor.on_executor_errored_delegate.add_callable(self._on_job_failed)
 
+        frames_str = self.proxy.get_job_extra_info_key_value("frames")
+        chunk_str = self.proxy.get_job_extra_info_key_value("chunk_size")
+        start_frame = None
+        end_frame = None
+        if frames_str:
+            try:
+                parts = [p.strip() for p in str(frames_str).split("-")]
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    start_frame = int(parts[0])
+                    end_frame = int(parts[1])
+            except Exception:
+                pass
+        chunk_size = 1
+        try:
+            if chunk_str:
+                chunk_size = int(chunk_str)
+        except Exception:
+            chunk_size = 1
+        if start_frame is not None and end_frame is not None:
+            frame_start = start_frame + (int(self.current_task_id) * chunk_size)
+            frame_end = min(frame_start + chunk_size - 1, end_frame)
+            unreal.log(
+                f"Task {self.current_task_id} custom frame range: {frame_start}-{frame_end} (chunk {chunk_size})"
+            )
+
         render_queue_manifest(
             manifest_file,
             shots=shots,
             user=self.proxy.get_job_user(),
             executor_instance=executor,
             output_dir_override=output_dir_override,
-            output_filename_override=filename_format_override
+            output_filename_override=filename_format_override,
+            custom_start_frame=frame_start if (start_frame is not None and end_frame is not None) else None,
+            custom_end_frame=frame_end if (start_frame is not None and end_frame is not None) else None
         )
 
     def render_sequence(
